@@ -1,489 +1,907 @@
 > 本文件在 "redis-zh" 项目中支持中文, 请看 "README_zh_CN.md" 文件！
 
-This README is just a fast *quick start* document. You can find more detailed documentation at [redis.io](https://redis.io).
+# Redis 源码介绍
 
-What is Redis?
---------------
+## 依赖包
 
-Redis is often referred to as a *data structures* server. What this means is that Redis provides access to mutable data structures via a set of commands, which are sent using a *server-client* model with TCP sockets and a simple protocol. So different processes can query and modify the same data structures in a shared way.
-
-Data structures implemented into Redis have a few special properties:
-
-* Redis cares to store them on disk, even if they are always served and modified into the server memory. This means that Redis is fast, but that it is also non-volatile.
-* The implementation of data structures emphasizes memory efficiency, so data structures inside Redis will likely use less memory compared to the same data structure modelled using a high-level programming language.
-* Redis offers a number of features that are natural to find in a database, like replication, tunable levels of durability, clustering, and high availability.
-
-Another good example is to think of Redis as a more complex version of memcached, where the operations are not just SETs and GETs, but operations that work with complex data types like Lists, Sets, ordered data structures, and so forth.
-
-If you want to know more, this is a list of selected starting points:
-
-* Introduction to Redis data types. https://redis.io/topics/data-types-intro
-* Try Redis directly inside your browser. http://try.redis.io
-* The full list of Redis commands. https://redis.io/commands
-* There is much more inside the official Redis documentation. https://redis.io/documentation
-
-Building Redis
---------------
-
-Redis can be compiled and used on Linux, OSX, OpenBSD, NetBSD, FreeBSD.
-We support big endian and little endian architectures, and both 32 bit
-and 64 bit systems.
-
-It may compile on Solaris derived systems (for instance SmartOS) but our
-support for this platform is *best effort* and Redis is not guaranteed to
-work as well as in Linux, OSX, and \*BSD.
-
-It is as simple as:
-
-    % make
-
-To build with TLS support, you'll need OpenSSL development libraries (e.g.
-libssl-dev on Debian/Ubuntu) and run:
-
-    % make BUILD_TLS=yes
-
-To build with systemd support, you'll need systemd development libraries (such 
-as libsystemd-dev on Debian/Ubuntu or systemd-devel on CentOS) and run:
-
-    % make USE_SYSTEMD=yes
-
-To append a suffix to Redis program names, use:
-
-    % make PROG_SUFFIX="-alt"
-
-You can build a 32 bit Redis binary using:
-
-    % make 32bit
-
-After building Redis, it is a good idea to test it using:
-
-    % make test
-
-If TLS is built, running the tests with TLS enabled (you will need `tcl-tls`
-installed):
-
-    % ./utils/gen-test-certs.sh
-    % ./runtest --tls
-
-
-Fixing build problems with dependencies or cached build options
----------
-
-Redis has some dependencies which are included in the `deps` directory.
-`make` does not automatically rebuild dependencies even if something in
-the source code of dependencies changes.
-
-When you update the source code with `git pull` or when code inside the
-dependencies tree is modified in any other way, make sure to use the following
-command in order to really clean everything and rebuild from scratch:
-
-    make distclean
-
-This will clean: jemalloc, lua, hiredis, linenoise.
-
-Also if you force certain build options like 32bit target, no C compiler
-optimizations (for debugging purposes), and other similar build time options,
-those options are cached indefinitely until you issue a `make distclean`
-command.
-
-Fixing problems building 32 bit binaries
----------
-
-If after building Redis with a 32 bit target you need to rebuild it
-with a 64 bit target, or the other way around, you need to perform a
-`make distclean` in the root directory of the Redis distribution.
-
-In case of build errors when trying to build a 32 bit binary of Redis, try
-the following steps:
-
-* Install the package libc6-dev-i386 (also try g++-multilib).
-* Try using the following command line instead of `make 32bit`:
-  `make CFLAGS="-m32 -march=native" LDFLAGS="-m32"`
-
-Allocator
----------
-
-Selecting a non-default memory allocator when building Redis is done by setting
-the `MALLOC` environment variable. Redis is compiled and linked against libc
-malloc by default, with the exception of jemalloc being the default on Linux
-systems. This default was picked because jemalloc has proven to have fewer
-fragmentation problems than libc malloc.
-
-To force compiling against libc malloc, use:
-
-    % make MALLOC=libc
-
-To compile against jemalloc on Mac OS X systems, use:
-
-    % make MALLOC=jemalloc
-
-Monotonic clock
----------------
-
-By default, Redis will build using the POSIX clock_gettime function as the
-monotonic clock source.  On most modern systems, the internal processor clock
-can be used to improve performance.  Cautions can be found here: 
-    http://oliveryang.net/2015/09/pitfalls-of-TSC-usage/
-
-To build with support for the processor's internal instruction clock, use:
-
-    % make CFLAGS="-DUSE_PROCESSOR_CLOCK"
-
-Verbose build
--------------
-
-Redis will build with a user-friendly colorized output by default.
-If you want to see a more verbose output, use the following:
-
-    % make V=1
-
-Running Redis
--------------
-
-To run Redis with the default configuration, just type:
-
-    % cd src
-    % ./redis-server
-
-If you want to provide your redis.conf, you have to run it using an additional
-parameter (the path of the configuration file):
-
-    % cd src
-    % ./redis-server /path/to/redis.conf
-
-It is possible to alter the Redis configuration by passing parameters directly
-as options using the command line. Examples:
-
-    % ./redis-server --port 9999 --replicaof 127.0.0.1 6379
-    % ./redis-server /etc/redis/6379.conf --loglevel debug
-
-All the options in redis.conf are also supported as options using the command
-line, with exactly the same name.
-
-Running Redis with TLS:
-------------------
-
-Please consult the [TLS.md](TLS.md) file for more information on
-how to use Redis with TLS.
-
-Playing with Redis
-------------------
-
-You can use redis-cli to play with Redis. Start a redis-server instance,
-then in another terminal try the following:
-
-    % cd src
-    % ./redis-cli
-    redis> ping
-    PONG
-    redis> set foo bar
-    OK
-    redis> get foo
-    "bar"
-    redis> incr mycounter
-    (integer) 1
-    redis> incr mycounter
-    (integer) 2
-    redis>
-
-You can find the list of all the available commands at https://redis.io/commands.
-
-Installing Redis
------------------
-
-In order to install Redis binaries into /usr/local/bin, just use:
-
-    % make install
-
-You can use `make PREFIX=/some/other/directory install` if you wish to use a
-different destination.
-
-Make install will just install binaries in your system, but will not configure
-init scripts and configuration files in the appropriate place. This is not
-needed if you just want to play a bit with Redis, but if you are installing
-it the proper way for a production system, we have a script that does this
-for Ubuntu and Debian systems:
-
-    % cd utils
-    % ./install_server.sh
-
-_Note_: `install_server.sh` will not work on Mac OSX; it is built for Linux only.
-
-The script will ask you a few questions and will setup everything you need
-to run Redis properly as a background daemon that will start again on
-system reboots.
-
-You'll be able to stop and start Redis using the script named
-`/etc/init.d/redis_<portnumber>`, for instance `/etc/init.d/redis_6379`.
-
-Code contributions
------------------
-
-Note: By contributing code to the Redis project in any form, including sending
-a pull request via Github, a code fragment or patch via private email or
-public discussion groups, you agree to release your code under the terms
-of the BSD license that you can find in the [COPYING][1] file included in the Redis
-source distribution.
-
-Please see the [CONTRIBUTING][2] file in this source distribution for more
-information, including details on our process for security bugs/vulnerabilities.
-
-[1]: https://github.com/redis/redis/blob/unstable/COPYING
-[2]: https://github.com/redis/redis/blob/unstable/CONTRIBUTING
-
-Redis internals
-===
-
-If you are reading this README you are likely in front of a Github page
-or you just untarred the Redis distribution tar ball. In both the cases
-you are basically one step away from the source code, so here we explain
-the Redis source code layout, what is in each file as a general idea, the
-most important functions and structures inside the Redis server and so forth.
-We keep all the discussion at a high level without digging into the details
-since this document would be huge otherwise and our code base changes
-continuously, but a general idea should be a good starting point to
-understand more. Moreover most of the code is heavily commented and easy
-to follow.
-
-Source code layout
----
-
-The Redis root directory just contains this README, the Makefile which
-calls the real Makefile inside the `src` directory and an example
-configuration for Redis and Sentinel. You can find a few shell
-scripts that are used in order to execute the Redis, Redis Cluster and
-Redis Sentinel unit tests, which are implemented inside the `tests`
-directory.
-
-Inside the root are the following important directories:
-
-* `src`: contains the Redis implementation, written in C.
-* `tests`: contains the unit tests, implemented in Tcl.
-* `deps`: contains libraries Redis uses. Everything needed to compile Redis is inside this directory; your system just needs to provide `libc`, a POSIX compatible interface and a C compiler. Notably `deps` contains a copy of `jemalloc`, which is the default allocator of Redis under Linux. Note that under `deps` there are also things which started with the Redis project, but for which the main repository is not `redis/redis`.
-
-There are a few more directories but they are not very important for our goals
-here. We'll focus mostly on `src`, where the Redis implementation is contained,
-exploring what there is inside each file. The order in which files are
-exposed is the logical one to follow in order to disclose different layers
-of complexity incrementally.
-
-Note: lately Redis was refactored quite a bit. Function names and file
-names have been changed, so you may find that this documentation reflects the
-`unstable` branch more closely. For instance, in Redis 3.0 the `server.c`
-and `server.h` files were named `redis.c` and `redis.h`. However the overall
-structure is the same. Keep in mind that all the new developments and pull
-requests should be performed against the `unstable` branch.
-
-server.h
----
-
-The simplest way to understand how a program works is to understand the
-data structures it uses. So we'll start from the main header file of
-Redis, which is `server.h`.
-
-All the server configuration and in general all the shared state is
-defined in a global structure called `server`, of type `struct redisServer`.
-A few important fields in this structure are:
-
-* `server.db` is an array of Redis databases, where data is stored.
-* `server.commands` is the command table.
-* `server.clients` is a linked list of clients connected to the server.
-* `server.master` is a special client, the master, if the instance is a replica.
-
-There are tons of other fields. Most fields are commented directly inside
-the structure definition.
-
-Another important Redis data structure is the one defining a client.
-In the past it was called `redisClient`, now just `client`. The structure
-has many fields, here we'll just show the main ones:
-```c
-struct client {
-    int fd;
-    sds querybuf;
-    int argc;
-    robj **argv;
-    redisDb *db;
-    int flags;
-    list *reply;
-    char buf[PROTO_REPLY_CHUNK_BYTES];
-    // ... many other fields ...
-}
 ```
-The client structure defines a *connected client*:
+.
+├── deps
+│   ├── hdr_histogram
+│   │   ├── hdr_atomic.h
+│   │   ├── hdr_histogram.c
+│   │   └── hdr_histogram.h
+│   ├── hiredis
+│   │   ├── adapters
+│   │   │   ├── ae.h
+│   │   │   ├── glib.h
+│   │   │   ├── ivykis.h
+│   │   │   ├── libev.h
+│   │   │   ├── libevent.h
+│   │   │   ├── libuv.h
+│   │   │   ├── macosx.h
+│   │   │   └── qt.h
+│   │   ├── alloc.c
+│   │   ├── alloc.h
+│   │   ├── appveyor.yml
+│   │   ├── async.c
+│   │   ├── async.h
+│   │   ├── async_private.h
+│   │   ├── dict.c
+│   │   ├── dict.h
+│   │   ├── examples
+│   │   │   ├── example-ae.c
+│   │   │   ├── example-glib.c
+│   │   │   ├── example-ivykis.c
+│   │   │   ├── example-libev.c
+│   │   │   ├── example-libevent-ssl.c
+│   │   │   ├── example-libevent.c
+│   │   │   ├── example-libuv.c
+│   │   │   ├── example-macosx.c
+│   │   │   ├── example-push.c
+│   │   │   ├── example-qt.cpp
+│   │   │   ├── example-qt.h
+│   │   │   ├── example-ssl.c
+│   │   │   └── example.c
+│   │   ├── fmacros.h
+│   │   ├── hiredis-config.cmake.in
+│   │   ├── hiredis.c
+│   │   ├── hiredis.h
+│   │   ├── hiredis.pc.in
+│   │   ├── hiredis_ssl-config.cmake.in
+│   │   ├── hiredis_ssl.h
+│   │   ├── hiredis_ssl.pc.in
+│   │   ├── net.c
+│   │   ├── net.h
+│   │   ├── read.c
+│   │   ├── read.h
+│   │   ├── sds.c
+│   │   ├── sds.h
+│   │   ├── sdsalloc.h
+│   │   ├── sdscompat.h
+│   │   ├── sockcompat.c
+│   │   ├── sockcompat.h
+│   │   ├── ssl.c
+│   │   ├── test.c
+│   │   ├── test.sh
+│   │   └── win32.h
+│   ├── jemalloc
+│   │   ├── autogen.sh
+│   │   ├── bin
+│   │   │   ├── jemalloc-config.in
+│   │   │   ├── jemalloc.sh.in
+│   │   │   └── jeprof.in
+│   │   ├── build-aux
+│   │   │   ├── config.guess
+│   │   │   ├── config.sub
+│   │   │   └── install-sh
+│   │   ├── config.stamp.in
+│   │   ├── configure
+│   │   ├── configure.ac
+│   │   ├── doc
+│   │   │   ├── html.xsl.in
+│   │   │   ├── jemalloc.xml.in
+│   │   │   ├── manpages.xsl.in
+│   │   │   └── stylesheet.xsl
+│   │   ├── include
+│   │   │   ├── jemalloc
+│   │   │   │   ├── internal
+│   │   │   │   │   ├── arena_externs.h
+│   │   │   │   │   ├── arena_inlines_a.h
+│   │   │   │   │   ├── arena_inlines_b.h
+│   │   │   │   │   ├── arena_stats.h
+│   │   │   │   │   ├── arena_structs_a.h
+│   │   │   │   │   ├── arena_structs_b.h
+│   │   │   │   │   ├── arena_types.h
+│   │   │   │   │   ├── assert.h
+│   │   │   │   │   ├── atomic.h
+│   │   │   │   │   ├── atomic_c11.h
+│   │   │   │   │   ├── atomic_gcc_atomic.h
+│   │   │   │   │   ├── atomic_gcc_sync.h
+│   │   │   │   │   ├── atomic_msvc.h
+│   │   │   │   │   ├── background_thread_externs.h
+│   │   │   │   │   ├── background_thread_inlines.h
+│   │   │   │   │   ├── background_thread_structs.h
+│   │   │   │   │   ├── base_externs.h
+│   │   │   │   │   ├── base_inlines.h
+│   │   │   │   │   ├── base_structs.h
+│   │   │   │   │   ├── base_types.h
+│   │   │   │   │   ├── bin.h
+│   │   │   │   │   ├── bin_stats.h
+│   │   │   │   │   ├── bit_util.h
+│   │   │   │   │   ├── bitmap.h
+│   │   │   │   │   ├── cache_bin.h
+│   │   │   │   │   ├── ckh.h
+│   │   │   │   │   ├── ctl.h
+│   │   │   │   │   ├── div.h
+│   │   │   │   │   ├── emitter.h
+│   │   │   │   │   ├── extent_dss.h
+│   │   │   │   │   ├── extent_externs.h
+│   │   │   │   │   ├── extent_inlines.h
+│   │   │   │   │   ├── extent_mmap.h
+│   │   │   │   │   ├── extent_structs.h
+│   │   │   │   │   ├── extent_types.h
+│   │   │   │   │   ├── hash.h
+│   │   │   │   │   ├── hooks.h
+│   │   │   │   │   ├── jemalloc_internal_decls.h
+│   │   │   │   │   ├── jemalloc_internal_defs.h.in
+│   │   │   │   │   ├── jemalloc_internal_externs.h
+│   │   │   │   │   ├── jemalloc_internal_includes.h
+│   │   │   │   │   ├── jemalloc_internal_inlines_a.h
+│   │   │   │   │   ├── jemalloc_internal_inlines_b.h
+│   │   │   │   │   ├── jemalloc_internal_inlines_c.h
+│   │   │   │   │   ├── jemalloc_internal_macros.h
+│   │   │   │   │   ├── jemalloc_internal_types.h
+│   │   │   │   │   ├── jemalloc_preamble.h.in
+│   │   │   │   │   ├── large_externs.h
+│   │   │   │   │   ├── log.h
+│   │   │   │   │   ├── malloc_io.h
+│   │   │   │   │   ├── mutex.h
+│   │   │   │   │   ├── mutex_pool.h
+│   │   │   │   │   ├── mutex_prof.h
+│   │   │   │   │   ├── nstime.h
+│   │   │   │   │   ├── pages.h
+│   │   │   │   │   ├── ph.h
+│   │   │   │   │   ├── private_namespace.sh
+│   │   │   │   │   ├── private_symbols.sh
+│   │   │   │   │   ├── prng.h
+│   │   │   │   │   ├── prof_externs.h
+│   │   │   │   │   ├── prof_inlines_a.h
+│   │   │   │   │   ├── prof_inlines_b.h
+│   │   │   │   │   ├── prof_structs.h
+│   │   │   │   │   ├── prof_types.h
+│   │   │   │   │   ├── public_namespace.sh
+│   │   │   │   │   ├── public_unnamespace.sh
+│   │   │   │   │   ├── ql.h
+│   │   │   │   │   ├── qr.h
+│   │   │   │   │   ├── rb.h
+│   │   │   │   │   ├── rtree.h
+│   │   │   │   │   ├── rtree_tsd.h
+│   │   │   │   │   ├── size_classes.sh
+│   │   │   │   │   ├── smoothstep.h
+│   │   │   │   │   ├── smoothstep.sh
+│   │   │   │   │   ├── spin.h
+│   │   │   │   │   ├── stats.h
+│   │   │   │   │   ├── sz.h
+│   │   │   │   │   ├── tcache_externs.h
+│   │   │   │   │   ├── tcache_inlines.h
+│   │   │   │   │   ├── tcache_structs.h
+│   │   │   │   │   ├── tcache_types.h
+│   │   │   │   │   ├── ticker.h
+│   │   │   │   │   ├── tsd.h
+│   │   │   │   │   ├── tsd_generic.h
+│   │   │   │   │   ├── tsd_malloc_thread_cleanup.h
+│   │   │   │   │   ├── tsd_tls.h
+│   │   │   │   │   ├── tsd_types.h
+│   │   │   │   │   ├── tsd_win.h
+│   │   │   │   │   ├── util.h
+│   │   │   │   │   └── witness.h
+│   │   │   │   ├── jemalloc.sh
+│   │   │   │   ├── jemalloc_defs.h.in
+│   │   │   │   ├── jemalloc_macros.h.in
+│   │   │   │   ├── jemalloc_mangle.sh
+│   │   │   │   ├── jemalloc_protos.h.in
+│   │   │   │   ├── jemalloc_rename.sh
+│   │   │   │   └── jemalloc_typedefs.h.in
+│   │   │   └── msvc_compat
+│   │   │       ├── C99
+│   │   │       │   ├── stdbool.h
+│   │   │       │   └── stdint.h
+│   │   │       ├── strings.h
+│   │   │       └── windows_extra.h
+│   │   ├── jemalloc.pc.in
+│   │   ├── m4
+│   │   │   └── ax_cxx_compile_stdcxx.m4
+│   │   ├── msvc
+│   │   │   ├── ReadMe.txt
+│   │   │   ├── jemalloc_vc2015.sln
+│   │   │   ├── jemalloc_vc2017.sln
+│   │   │   ├── projects
+│   │   │   │   ├── vc2015
+│   │   │   │   │   ├── jemalloc
+│   │   │   │   │   │   ├── jemalloc.vcxproj
+│   │   │   │   │   │   └── jemalloc.vcxproj.filters
+│   │   │   │   │   └── test_threads
+│   │   │   │   │       ├── test_threads.vcxproj
+│   │   │   │   │       └── test_threads.vcxproj.filters
+│   │   │   │   └── vc2017
+│   │   │   │       ├── jemalloc
+│   │   │   │       │   ├── jemalloc.vcxproj
+│   │   │   │       │   └── jemalloc.vcxproj.filters
+│   │   │   │       └── test_threads
+│   │   │   │           ├── test_threads.vcxproj
+│   │   │   │           └── test_threads.vcxproj.filters
+│   │   │   └── test_threads
+│   │   │       ├── test_threads.cpp
+│   │   │       ├── test_threads.h
+│   │   │       └── test_threads_main.cpp
+│   │   ├── run_tests.sh
+│   │   ├── scripts
+│   │   │   ├── gen_run_tests.py
+│   │   │   └── gen_travis.py
+│   │   ├── src
+│   │   │   ├── arena.c
+│   │   │   ├── background_thread.c
+│   │   │   ├── base.c
+│   │   │   ├── bin.c
+│   │   │   ├── bitmap.c
+│   │   │   ├── ckh.c
+│   │   │   ├── ctl.c
+│   │   │   ├── div.c
+│   │   │   ├── extent.c
+│   │   │   ├── extent_dss.c
+│   │   │   ├── extent_mmap.c
+│   │   │   ├── hash.c
+│   │   │   ├── hooks.c
+│   │   │   ├── jemalloc.c
+│   │   │   ├── jemalloc_cpp.cpp
+│   │   │   ├── large.c
+│   │   │   ├── log.c
+│   │   │   ├── malloc_io.c
+│   │   │   ├── mutex.c
+│   │   │   ├── mutex_pool.c
+│   │   │   ├── nstime.c
+│   │   │   ├── pages.c
+│   │   │   ├── prng.c
+│   │   │   ├── prof.c
+│   │   │   ├── rtree.c
+│   │   │   ├── stats.c
+│   │   │   ├── sz.c
+│   │   │   ├── tcache.c
+│   │   │   ├── ticker.c
+│   │   │   ├── tsd.c
+│   │   │   ├── witness.c
+│   │   │   └── zone.c
+│   │   └── test
+│   │       ├── include
+│   │       │   └── test
+│   │       │       ├── SFMT-alti.h
+│   │       │       ├── SFMT-params.h
+│   │       │       ├── SFMT-params11213.h
+│   │       │       ├── SFMT-params1279.h
+│   │       │       ├── SFMT-params132049.h
+│   │       │       ├── SFMT-params19937.h
+│   │       │       ├── SFMT-params216091.h
+│   │       │       ├── SFMT-params2281.h
+│   │       │       ├── SFMT-params4253.h
+│   │       │       ├── SFMT-params44497.h
+│   │       │       ├── SFMT-params607.h
+│   │       │       ├── SFMT-params86243.h
+│   │       │       ├── SFMT-sse2.h
+│   │       │       ├── SFMT.h
+│   │       │       ├── btalloc.h
+│   │       │       ├── extent_hooks.h
+│   │       │       ├── jemalloc_test.h.in
+│   │       │       ├── jemalloc_test_defs.h.in
+│   │       │       ├── math.h
+│   │       │       ├── mq.h
+│   │       │       ├── mtx.h
+│   │       │       ├── test.h
+│   │       │       ├── thd.h
+│   │       │       └── timer.h
+│   │       ├── integration
+│   │       │   ├── MALLOCX_ARENA.c
+│   │       │   ├── aligned_alloc.c
+│   │       │   ├── allocated.c
+│   │       │   ├── cpp
+│   │       │   │   └── basic.cpp
+│   │       │   ├── extent.c
+│   │       │   ├── extent.sh
+│   │       │   ├── mallocx.c
+│   │       │   ├── mallocx.sh
+│   │       │   ├── overflow.c
+│   │       │   ├── posix_memalign.c
+│   │       │   ├── rallocx.c
+│   │       │   ├── sdallocx.c
+│   │       │   ├── thread_arena.c
+│   │       │   ├── thread_tcache_enabled.c
+│   │       │   ├── xallocx.c
+│   │       │   └── xallocx.sh
+│   │       ├── src
+│   │       │   ├── SFMT.c
+│   │       │   ├── btalloc.c
+│   │       │   ├── btalloc_0.c
+│   │       │   ├── btalloc_1.c
+│   │       │   ├── math.c
+│   │       │   ├── mq.c
+│   │       │   ├── mtx.c
+│   │       │   ├── test.c
+│   │       │   ├── thd.c
+│   │       │   └── timer.c
+│   │       ├── stress
+│   │       │   └── microbench.c
+│   │       ├── test.sh.in
+│   │       └── unit
+│   │           ├── SFMT.c
+│   │           ├── a0.c
+│   │           ├── arena_reset.c
+│   │           ├── arena_reset_prof.c
+│   │           ├── arena_reset_prof.sh
+│   │           ├── atomic.c
+│   │           ├── background_thread.c
+│   │           ├── background_thread_enable.c
+│   │           ├── base.c
+│   │           ├── bit_util.c
+│   │           ├── bitmap.c
+│   │           ├── ckh.c
+│   │           ├── decay.c
+│   │           ├── decay.sh
+│   │           ├── div.c
+│   │           ├── emitter.c
+│   │           ├── extent_quantize.c
+│   │           ├── fork.c
+│   │           ├── hash.c
+│   │           ├── hooks.c
+│   │           ├── junk.c
+│   │           ├── junk.sh
+│   │           ├── junk_alloc.c
+│   │           ├── junk_alloc.sh
+│   │           ├── junk_free.c
+│   │           ├── junk_free.sh
+│   │           ├── log.c
+│   │           ├── mallctl.c
+│   │           ├── malloc_io.c
+│   │           ├── math.c
+│   │           ├── mq.c
+│   │           ├── mtx.c
+│   │           ├── nstime.c
+│   │           ├── pack.c
+│   │           ├── pack.sh
+│   │           ├── pages.c
+│   │           ├── ph.c
+│   │           ├── prng.c
+│   │           ├── prof_accum.c
+│   │           ├── prof_accum.sh
+│   │           ├── prof_active.c
+│   │           ├── prof_active.sh
+│   │           ├── prof_gdump.c
+│   │           ├── prof_gdump.sh
+│   │           ├── prof_idump.c
+│   │           ├── prof_idump.sh
+│   │           ├── prof_reset.c
+│   │           ├── prof_reset.sh
+│   │           ├── prof_tctx.c
+│   │           ├── prof_tctx.sh
+│   │           ├── prof_thread_name.c
+│   │           ├── prof_thread_name.sh
+│   │           ├── ql.c
+│   │           ├── qr.c
+│   │           ├── rb.c
+│   │           ├── retained.c
+│   │           ├── rtree.c
+│   │           ├── size_classes.c
+│   │           ├── slab.c
+│   │           ├── smoothstep.c
+│   │           ├── spin.c
+│   │           ├── stats.c
+│   │           ├── stats_print.c
+│   │           ├── ticker.c
+│   │           ├── tsd.c
+│   │           ├── witness.c
+│   │           ├── zero.c
+│   │           └── zero.sh
+│   ├── linenoise
+│   │   ├── example.c
+│   │   ├── linenoise.c
+│   │   └── linenoise.h
+│   ├── lua
+│   │   ├── etc
+│   │   │   ├── all.c
+│   │   │   ├── lua.hpp
+│   │   │   ├── lua.ico
+│   │   │   ├── lua.pc
+│   │   │   ├── luavs.bat
+│   │   │   ├── min.c
+│   │   │   ├── noparser.c
+│   │   │   └── strict.lua
+│   │   ├── src
+│   │   │   ├── fpconv.c
+│   │   │   ├── fpconv.h
+│   │   │   ├── lapi.c
+│   │   │   ├── lapi.h
+│   │   │   ├── lauxlib.c
+│   │   │   ├── lauxlib.h
+│   │   │   ├── lbaselib.c
+│   │   │   ├── lcode.c
+│   │   │   ├── lcode.h
+│   │   │   ├── ldblib.c
+│   │   │   ├── ldebug.c
+│   │   │   ├── ldebug.h
+│   │   │   ├── ldo.c
+│   │   │   ├── ldo.h
+│   │   │   ├── ldump.c
+│   │   │   ├── lfunc.c
+│   │   │   ├── lfunc.h
+│   │   │   ├── lgc.c
+│   │   │   ├── lgc.h
+│   │   │   ├── linit.c
+│   │   │   ├── liolib.c
+│   │   │   ├── llex.c
+│   │   │   ├── llex.h
+│   │   │   ├── llimits.h
+│   │   │   ├── lmathlib.c
+│   │   │   ├── lmem.c
+│   │   │   ├── lmem.h
+│   │   │   ├── loadlib.c
+│   │   │   ├── lobject.c
+│   │   │   ├── lobject.h
+│   │   │   ├── lopcodes.c
+│   │   │   ├── lopcodes.h
+│   │   │   ├── loslib.c
+│   │   │   ├── lparser.c
+│   │   │   ├── lparser.h
+│   │   │   ├── lstate.c
+│   │   │   ├── lstate.h
+│   │   │   ├── lstring.c
+│   │   │   ├── lstring.h
+│   │   │   ├── lstrlib.c
+│   │   │   ├── ltable.c
+│   │   │   ├── ltable.h
+│   │   │   ├── ltablib.c
+│   │   │   ├── ltm.c
+│   │   │   ├── ltm.h
+│   │   │   ├── lua.c
+│   │   │   ├── lua.h
+│   │   │   ├── lua_bit.c
+│   │   │   ├── lua_cjson.c
+│   │   │   ├── lua_cmsgpack.c
+│   │   │   ├── lua_struct.c
+│   │   │   ├── luac.c
+│   │   │   ├── luaconf.h
+│   │   │   ├── lualib.h
+│   │   │   ├── lundump.c
+│   │   │   ├── lundump.h
+│   │   │   ├── lvm.c
+│   │   │   ├── lvm.h
+│   │   │   ├── lzio.c
+│   │   │   ├── lzio.h
+│   │   │   ├── print.c
+│   │   │   ├── strbuf.c
+│   │   │   └── strbuf.h
+│   │   └── test
+│   │       ├── bisect.lua
+│   │       ├── cf.lua
+│   │       ├── echo.lua
+│   │       ├── env.lua
+│   │       ├── factorial.lua
+│   │       ├── fib.lua
+│   │       ├── fibfor.lua
+│   │       ├── globals.lua
+│   │       ├── hello.lua
+│   │       ├── life.lua
+│   │       ├── luac.lua
+│   │       ├── printf.lua
+│   │       ├── readonly.lua
+│   │       ├── sieve.lua
+│   │       ├── sort.lua
+│   │       ├── table.lua
+│   │       ├── trace-calls.lua
+│   │       ├── trace-globals.lua
+│   │       └── xd.lua
+│   └── update-jemalloc.sh
+```
 
-* The `fd` field is the client socket file descriptor.
-* `argc` and `argv` are populated with the command the client is executing, so that functions implementing a given Redis command can read the arguments.
-* `querybuf` accumulates the requests from the client, which are parsed by the Redis server according to the Redis protocol and executed by calling the implementations of the commands the client is executing.
-* `reply` and `buf` are dynamic and static buffers that accumulate the replies the server sends to the client. These buffers are incrementally written to the socket as soon as the file descriptor is writeable.
+## 主要实现
 
-As you can see in the client structure above, arguments in a command
-are described as `robj` structures. The following is the full `robj`
-structure, which defines a *Redis object*:
+```
+├── src
+│   ├── acl.c
+│   ├── adlist.c
+│   ├── adlist.h
+│   ├── ae.c
+│   ├── ae.h
+│   ├── ae_epoll.c
+│   ├── ae_evport.c
+│   ├── ae_kqueue.c
+│   ├── ae_select.c
+│   ├── anet.c
+│   ├── anet.h
+│   ├── aof.c
+│   ├── asciilogo.h
+│   ├── atomicvar.h
+│   ├── bio.c
+│   ├── bio.h
+│   ├── bitops.c
+│   ├── blocked.c
+│   ├── childinfo.c
+│   ├── cli_common.c
+│   ├── cli_common.h
+│   ├── cluster.c
+│   ├── cluster.h
+│   ├── config.c
+│   ├── config.h
+│   ├── connection.c
+│   ├── connection.h
+│   ├── connhelpers.h
+│   ├── crc16.c
+│   ├── crc16_slottable.h
+│   ├── crc64.c
+│   ├── crc64.h
+│   ├── crcspeed.c
+│   ├── crcspeed.h
+│   ├── db.c
+│   ├── debug.c
+│   ├── debugmacro.h
+│   ├── defrag.c
+│   ├── dict.c
+│   ├── dict.h
+│   ├── endianconv.c
+│   ├── endianconv.h
+│   ├── evict.c
+│   ├── expire.c
+│   ├── fmacros.h
+│   ├── geo.c
+│   ├── geo.h
+│   ├── geohash.c
+│   ├── geohash.h
+│   ├── geohash_helper.c
+│   ├── geohash_helper.h
+│   ├── gopher.c
+│   ├── help.h
+│   ├── hyperloglog.c
+│   ├── intset.c
+│   ├── intset.h
+│   ├── latency.c
+│   ├── latency.h
+│   ├── lazyfree.c
+│   ├── listpack.c
+│   ├── listpack.h
+│   ├── listpack_malloc.h
+│   ├── localtime.c
+│   ├── lolwut.c
+│   ├── lolwut.h
+│   ├── lolwut5.c
+│   ├── lolwut6.c
+│   ├── lzf.h
+│   ├── lzfP.h
+│   ├── lzf_c.c
+│   ├── lzf_d.c
+│   ├── memtest.c
+│   ├── mkreleasehdr.sh
+│   ├── module.c
+│   ├── modules
+│   │   ├── Makefile
+│   │   ├── gendoc.rb
+│   │   ├── helloacl.c
+│   │   ├── helloblock.c
+│   │   ├── hellocluster.c
+│   │   ├── hellodict.c
+│   │   ├── hellohook.c
+│   │   ├── hellotimer.c
+│   │   ├── hellotype.c
+│   │   └── helloworld.c
+│   ├── monotonic.c
+│   ├── monotonic.h
+│   ├── mt19937-64.c
+│   ├── mt19937-64.h
+│   ├── multi.c
+│   ├── networking.c
+│   ├── notify.c
+│   ├── object.c
+│   ├── pqsort.c
+│   ├── pqsort.h
+│   ├── pubsub.c
+│   ├── quicklist.c
+│   ├── quicklist.h
+│   ├── rand.c
+│   ├── rand.h
+│   ├── rax.c
+│   ├── rax.h
+│   ├── rax_malloc.h
+│   ├── rdb.c
+│   ├── rdb.h
+│   ├── redis-benchmark.c
+│   ├── redis-check-aof.c
+│   ├── redis-check-rdb.c
+│   ├── redis-cli.c
+│   ├── redis-trib.rb
+│   ├── redisassert.h
+│   ├── redismodule.h
+│   ├── release.c
+│   ├── replication.c
+│   ├── rio.c
+│   ├── rio.h
+│   ├── scripting.c
+│   ├── sds.c
+│   ├── sds.h
+│   ├── sdsalloc.h
+│   ├── sentinel.c
+│   ├── server.c
+│   ├── server.h
+│   ├── setcpuaffinity.c
+│   ├── setproctitle.c
+│   ├── sha1.c
+│   ├── sha1.h
+│   ├── sha256.c
+│   ├── sha256.h
+│   ├── siphash.c
+│   ├── slowlog.c
+│   ├── slowlog.h
+│   ├── solarisfixes.h
+│   ├── sort.c
+│   ├── sparkline.c
+│   ├── sparkline.h
+│   ├── stream.h
+│   ├── syncio.c
+│   ├── t_hash.c
+│   ├── t_list.c
+│   ├── t_set.c
+│   ├── t_stream.c
+│   ├── t_string.c
+│   ├── t_zset.c
+│   ├── testhelp.h
+│   ├── timeout.c
+│   ├── tls.c
+│   ├── tracking.c
+│   ├── util.c
+│   ├── util.h
+│   ├── valgrind.sup
+│   ├── version.h
+│   ├── ziplist.c
+│   ├── ziplist.h
+│   ├── zipmap.c
+│   ├── zipmap.h
+│   ├── zmalloc.c
+│   └── zmalloc.h
+```
 
-    typedef struct redisObject {
-        unsigned type:4;
-        unsigned encoding:4;
-        unsigned lru:LRU_BITS; /* lru time (relative to server.lruclock) */
-        int refcount;
-        void *ptr;
-    } robj;
+## 测试代码
 
-Basically this structure can represent all the basic Redis data types like
-strings, lists, sets, sorted sets and so forth. The interesting thing is that
-it has a `type` field, so that it is possible to know what type a given
-object has, and a `refcount`, so that the same object can be referenced
-in multiple places without allocating it multiple times. Finally the `ptr`
-field points to the actual representation of the object, which might vary
-even for the same type, depending on the `encoding` used.
+```shell
+├── tests
+│   ├── assets
+│   │   ├── corrupt_empty_keys.rdb
+│   │   ├── corrupt_ziplist.rdb
+│   │   ├── default.conf
+│   │   ├── encodings.rdb
+│   │   ├── hash-zipmap.rdb
+│   │   ├── minimal.conf
+│   │   ├── nodefaultuser.acl
+│   │   └── user.acl
+│   ├── cluster
+│   │   ├── cluster.tcl
+│   │   ├── run.tcl
+│   │   ├── tests
+│   │   │   ├── 00-base.tcl
+│   │   │   ├── 01-faildet.tcl
+│   │   │   ├── 02-failover.tcl
+│   │   │   ├── 03-failover-loop.tcl
+│   │   │   ├── 04-resharding.tcl
+│   │   │   ├── 05-slave-selection.tcl
+│   │   │   ├── 06-slave-stop-cond.tcl
+│   │   │   ├── 07-replica-migration.tcl
+│   │   │   ├── 08-update-msg.tcl
+│   │   │   ├── 09-pubsub.tcl
+│   │   │   ├── 10-manual-failover.tcl
+│   │   │   ├── 11-manual-takeover.tcl
+│   │   │   ├── 12-replica-migration-2.tcl
+│   │   │   ├── 12.1-replica-migration-3.tcl
+│   │   │   ├── 13-no-failover-option.tcl
+│   │   │   ├── 14-consistency-check.tcl
+│   │   │   ├── 15-cluster-slots.tcl
+│   │   │   ├── 16-transactions-on-replica.tcl
+│   │   │   ├── 17-diskless-load-swapdb.tcl
+│   │   │   ├── 18-info.tcl
+│   │   │   ├── 19-cluster-nodes-slots.tcl
+│   │   │   ├── 20-half-migrated-slot.tcl
+│   │   │   ├── 21-many-slot-migration.tcl
+│   │   │   ├── helpers
+│   │   │   │   └── onlydots.tcl
+│   │   │   └── includes
+│   │   │       ├── init-tests.tcl
+│   │   │       └── utils.tcl
+│   │   └── tmp
+│   ├── helpers
+│   │   ├── bg_block_op.tcl
+│   │   ├── bg_complex_data.tcl
+│   │   ├── fake_redis_node.tcl
+│   │   └── gen_write_load.tcl
+│   ├── instances.tcl
+│   ├── integration
+│   │   ├── aof-race.tcl
+│   │   ├── aof.tcl
+│   │   ├── block-repl.tcl
+│   │   ├── convert-zipmap-hash-on-load.tcl
+│   │   ├── corrupt-dump-fuzzer.tcl
+│   │   ├── corrupt-dump.tcl
+│   │   ├── failover.tcl
+│   │   ├── logging.tcl
+│   │   ├── psync2-pingoff.tcl
+│   │   ├── psync2-reg.tcl
+│   │   ├── psync2.tcl
+│   │   ├── rdb.tcl
+│   │   ├── redis-benchmark.tcl
+│   │   ├── redis-cli.tcl
+│   │   ├── replication-2.tcl
+│   │   ├── replication-3.tcl
+│   │   ├── replication-4.tcl
+│   │   ├── replication-psync.tcl
+│   │   └── replication.tcl
+│   ├── modules
+│   │   ├── Makefile
+│   │   ├── auth.c
+│   │   ├── basics.c
+│   │   ├── blockedclient.c
+│   │   ├── blockonbackground.c
+│   │   ├── blockonkeys.c
+│   │   ├── commandfilter.c
+│   │   ├── datatype.c
+│   │   ├── defragtest.c
+│   │   ├── fork.c
+│   │   ├── getkeys.c
+│   │   ├── hash.c
+│   │   ├── hooks.c
+│   │   ├── infotest.c
+│   │   ├── keyspace_events.c
+│   │   ├── misc.c
+│   │   ├── propagate.c
+│   │   ├── scan.c
+│   │   ├── stream.c
+│   │   ├── test_lazyfree.c
+│   │   ├── testrdb.c
+│   │   ├── timer.c
+│   │   └── zset.c
+│   ├── sentinel
+│   │   ├── run.tcl
+│   │   ├── tests
+│   │   │   ├── 00-base.tcl
+│   │   │   ├── 01-conf-update.tcl
+│   │   │   ├── 02-slaves-reconf.tcl
+│   │   │   ├── 03-runtime-reconf.tcl
+│   │   │   ├── 04-slave-selection.tcl
+│   │   │   ├── 05-manual.tcl
+│   │   │   ├── 06-ckquorum.tcl
+│   │   │   ├── 07-down-conditions.tcl
+│   │   │   ├── 08-hostname-conf.tcl
+│   │   │   ├── 09-acl-support.tcl
+│   │   │   ├── 10-replica-priority.tcl
+│   │   │   ├── helpers
+│   │   │   │   └── check_leaked_fds.tcl
+│   │   │   └── includes
+│   │   │       ├── init-tests.tcl
+│   │   │       ├── sentinel.conf
+│   │   │       └── start-init-tests.tcl
+│   │   └── tmp
+│   ├── support
+│   │   ├── benchmark.tcl
+│   │   ├── cli.tcl
+│   │   ├── cluster.tcl
+│   │   ├── redis.tcl
+│   │   ├── server.tcl
+│   │   ├── test.tcl
+│   │   ├── tmpfile.tcl
+│   │   └── util.tcl
+│   ├── test_helper.tcl
+│   ├── tmp
+│   └── unit
+│       ├── acl.tcl
+│       ├── aofrw.tcl
+│       ├── auth.tcl
+│       ├── bitfield.tcl
+│       ├── bitops.tcl
+│       ├── dump.tcl
+│       ├── expire.tcl
+│       ├── geo.tcl
+│       ├── hyperloglog.tcl
+│       ├── info.tcl
+│       ├── introspection-2.tcl
+│       ├── introspection.tcl
+│       ├── keyspace.tcl
+│       ├── latency-monitor.tcl
+│       ├── lazyfree.tcl
+│       ├── limits.tcl
+│       ├── maxmemory.tcl
+│       ├── memefficiency.tcl
+│       ├── moduleapi
+│       │   ├── auth.tcl
+│       │   ├── basics.tcl
+│       │   ├── blockedclient.tcl
+│       │   ├── blockonbackground.tcl
+│       │   ├── blockonkeys.tcl
+│       │   ├── commandfilter.tcl
+│       │   ├── datatype.tcl
+│       │   ├── defrag.tcl
+│       │   ├── fork.tcl
+│       │   ├── getkeys.tcl
+│       │   ├── hash.tcl
+│       │   ├── hooks.tcl
+│       │   ├── infotest.tcl
+│       │   ├── keyspace_events.tcl
+│       │   ├── misc.tcl
+│       │   ├── propagate.tcl
+│       │   ├── scan.tcl
+│       │   ├── stream.tcl
+│       │   ├── test_lazyfree.tcl
+│       │   ├── testrdb.tcl
+│       │   ├── timer.tcl
+│       │   └── zset.tcl
+│       ├── multi.tcl
+│       ├── networking.tcl
+│       ├── obuf-limits.tcl
+│       ├── oom-score-adj.tcl
+│       ├── other.tcl
+│       ├── pause.tcl
+│       ├── pendingquerybuf.tcl
+│       ├── printver.tcl
+│       ├── protocol.tcl
+│       ├── pubsub.tcl
+│       ├── quit.tcl
+│       ├── scan.tcl
+│       ├── scripting.tcl
+│       ├── shutdown.tcl
+│       ├── slowlog.tcl
+│       ├── sort.tcl
+│       ├── tls.tcl
+│       ├── tracking.tcl
+│       ├── type
+│       │   ├── hash.tcl
+│       │   ├── incr.tcl
+│       │   ├── list-2.tcl
+│       │   ├── list-3.tcl
+│       │   ├── list-common.tcl
+│       │   ├── list.tcl
+│       │   ├── set.tcl
+│       │   ├── stream-cgroups.tcl
+│       │   ├── stream.tcl
+│       │   ├── string.tcl
+│       │   └── zset.tcl
+│       ├── violations.tcl
+│       └── wait.tcl
+```
 
-Redis objects are used extensively in the Redis internals, however in order
-to avoid the overhead of indirect accesses, recently in many places
-we just use plain dynamic strings not wrapped inside a Redis object.
+## 工具包
 
-server.c
----
+```
 
-This is the entry point of the Redis server, where the `main()` function
-is defined. The following are the most important steps in order to startup
-the Redis server.
+├── utils
+│   ├── build-static-symbols.tcl
+│   ├── cluster_fail_time.tcl
+│   ├── corrupt_rdb.c
+│   ├── create-cluster
+│   │   └── create-cluster
+│   ├── gen-test-certs.sh
+│   ├── generate-command-help.rb
+│   ├── graphs
+│   │   └── commits-over-time
+│   │       └── genhtml.tcl
+│   ├── hashtable
+│   │   └── rehashing.c
+│   ├── hyperloglog
+│   │   ├── hll-err.rb
+│   │   └── hll-gnuplot-graph.rb
+│   ├── install_server.sh
+│   ├── lru
+│   │   ├── lfu-simulation.c
+│   │   └── test-lru.rb
+│   ├── redis-copy.rb
+│   ├── redis-sha1.rb
+│   ├── redis_init_script
+│   ├── redis_init_script.tpl
+│   ├── releasetools
+│   │   ├── 01_create_tarball.sh
+│   │   ├── 02_upload_tarball.sh
+│   │   ├── 03_test_release.sh
+│   │   ├── 04_release_hash.sh
+│   │   └── changelog.tcl
+│   ├── speed-regression.tcl
+│   ├── srandmember
+│   │   ├── showdist.rb
+│   │   └── showfreq.rb
+│   ├── systemd-redis_multiple_servers@.service
+│   ├── systemd-redis_server.service
+│   ├── tracking_collisions.c
+│   └── whatisdoing.sh
 
-* `initServerConfig()` sets up the default values of the `server` structure.
-* `initServer()` allocates the data structures needed to operate, setup the listening socket, and so forth.
-* `aeMain()` starts the event loop which listens for new connections.
+```
 
-There are two special functions called periodically by the event loop:
+## 其他文件
 
-1. `serverCron()` is called periodically (according to `server.hz` frequency), and performs tasks that must be performed from time to time, like checking for timed out clients.
-2. `beforeSleep()` is called every time the event loop fired, Redis served a few requests, and is returning back into the event loop.
-
-Inside server.c you can find code that handles other vital things of the Redis server:
-
-* `call()` is used in order to call a given command in the context of a given client.
-* `activeExpireCycle()` handles eviction of keys with a time to live set via the `EXPIRE` command.
-* `performEvictions()` is called when a new write command should be performed but Redis is out of memory according to the `maxmemory` directive.
-* The global variable `redisCommandTable` defines all the Redis commands, specifying the name of the command, the function implementing the command, the number of arguments required, and other properties of each command.
-
-networking.c
----
-
-This file defines all the I/O functions with clients, masters and replicas
-(which in Redis are just special clients):
-
-* `createClient()` allocates and initializes a new client.
-* the `addReply*()` family of functions are used by command implementations in order to append data to the client structure, that will be transmitted to the client as a reply for a given command executed.
-* `writeToClient()` transmits the data pending in the output buffers to the client and is called by the *writable event handler* `sendReplyToClient()`.
-* `readQueryFromClient()` is the *readable event handler* and accumulates data read from the client into the query buffer.
-* `processInputBuffer()` is the entry point in order to parse the client query buffer according to the Redis protocol. Once commands are ready to be processed, it calls `processCommand()` which is defined inside `server.c` in order to actually execute the command.
-* `freeClient()` deallocates, disconnects and removes a client.
-
-aof.c and rdb.c
----
-
-As you can guess from the names, these files implement the RDB and AOF
-persistence for Redis. Redis uses a persistence model based on the `fork()`
-system call in order to create a thread with the same (shared) memory
-content of the main Redis thread. This secondary thread dumps the content
-of the memory on disk. This is used by `rdb.c` to create the snapshots
-on disk and by `aof.c` in order to perform the AOF rewrite when the
-append only file gets too big.
-
-The implementation inside `aof.c` has additional functions in order to
-implement an API that allows commands to append new commands into the AOF
-file as clients execute them.
-
-The `call()` function defined inside `server.c` is responsible for calling
-the functions that in turn will write the commands into the AOF.
-
-db.c
----
-
-Certain Redis commands operate on specific data types; others are general.
-Examples of generic commands are `DEL` and `EXPIRE`. They operate on keys
-and not on their values specifically. All those generic commands are
-defined inside `db.c`.
-
-Moreover `db.c` implements an API in order to perform certain operations
-on the Redis dataset without directly accessing the internal data structures.
-
-The most important functions inside `db.c` which are used in many command
-implementations are the following:
-
-* `lookupKeyRead()` and `lookupKeyWrite()` are used in order to get a pointer to the value associated to a given key, or `NULL` if the key does not exist.
-* `dbAdd()` and its higher level counterpart `setKey()` create a new key in a Redis database.
-* `dbDelete()` removes a key and its associated value.
-* `emptyDb()` removes an entire single database or all the databases defined.
-
-The rest of the file implements the generic commands exposed to the client.
-
-object.c
----
-
-The `robj` structure defining Redis objects was already described. Inside
-`object.c` there are all the functions that operate with Redis objects at
-a basic level, like functions to allocate new objects, handle the reference
-counting and so forth. Notable functions inside this file:
-
-* `incrRefCount()` and `decrRefCount()` are used in order to increment or decrement an object reference count. When it drops to 0 the object is finally freed.
-* `createObject()` allocates a new object. There are also specialized functions to allocate string objects having a specific content, like `createStringObjectFromLongLong()` and similar functions.
-
-This file also implements the `OBJECT` command.
-
-replication.c
----
-
-This is one of the most complex files inside Redis, it is recommended to
-approach it only after getting a bit familiar with the rest of the code base.
-In this file there is the implementation of both the master and replica role
-of Redis.
-
-One of the most important functions inside this file is `replicationFeedSlaves()` that writes commands to the clients representing replica instances connected
-to our master, so that the replicas can get the writes performed by the clients:
-this way their data set will remain synchronized with the one in the master.
-
-This file also implements both the `SYNC` and `PSYNC` commands that are
-used in order to perform the first synchronization between masters and
-replicas, or to continue the replication after a disconnection.
-
-Other C files
----
-
-* `t_hash.c`, `t_list.c`, `t_set.c`, `t_string.c`, `t_zset.c` and `t_stream.c` contains the implementation of the Redis data types. They implement both an API to access a given data type, and the client command implementations for these data types.
-* `ae.c` implements the Redis event loop, it's a self contained library which is simple to read and understand.
-* `sds.c` is the Redis string library, check http://github.com/antirez/sds for more information.
-* `anet.c` is a library to use POSIX networking in a simpler way compared to the raw interface exposed by the kernel.
-* `dict.c` is an implementation of a non-blocking hash table which rehashes incrementally.
-* `scripting.c` implements Lua scripting. It is completely self-contained and isolated from the rest of the Redis implementation and is simple enough to understand if you are familiar with the Lua API.
-* `cluster.c` implements the Redis Cluster. Probably a good read only after being very familiar with the rest of the Redis code base. If you want to read `cluster.c` make sure to read the [Redis Cluster specification][3].
-
-[3]: https://redis.io/topics/cluster-spec
-
-Anatomy of a Redis command
----
-
-All the Redis commands are defined in the following way:
-
-    void foobarCommand(client *c) {
-        printf("%s",c->argv[1]->ptr); /* Do something with the argument. */
-        addReply(c,shared.ok); /* Reply something to the client. */
-    }
-
-The command is then referenced inside `server.c` in the command table:
-
-    {"foobar",foobarCommand,2,"rtF",0,NULL,0,0,0,0,0},
-
-In the above example `2` is the number of arguments the command takes,
-while `"rtF"` are the command flags, as documented in the command table
-top comment inside `server.c`.
-
-After the command operates in some way, it returns a reply to the client,
-usually using `addReply()` or a similar function defined inside `networking.c`.
-
-There are tons of command implementations inside the Redis source code
-that can serve as examples of actual commands implementations. Writing
-a few toy commands can be a good exercise to get familiar with the code base.
-
-There are also many other files not described here, but it is useless to
-cover everything. We just want to help you with the first steps.
-Eventually you'll find your way inside the Redis code base :-)
-
-Enjoy!
+```
+├── redis.conf
+├── runtest
+├── runtest-cluster
+├── runtest-moduleapi
+├── runtest-sentinel
+├── sentinel.conf
+└── version.txt
+```
