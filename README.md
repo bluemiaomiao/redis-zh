@@ -1,3 +1,5 @@
+> 本文件在 "redis-zh" 项目中支持中文, 请看 "README_zh_CN.md" 文件！
+
 This README is just a fast *quick start* document. You can find more detailed documentation at [redis.io](https://redis.io).
 
 What is Redis?
