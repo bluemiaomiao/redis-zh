@@ -14,10 +14,10 @@ Redis通常被称为一个*数据结构*服务器。这意味着Redis通过一�
 
 如果您想了解更多信息，以下是所选起点的列表：
 
-* Redis数据类型简介。https://redis.io/topics/data-types-intro
-* 直接在浏览器中尝试Redis。http://try.redis.io
-* Redis命令的完整列表。https://redis.io/commands
-* Redis官方文档中还有更多内容。https://redis.io/documentation
+* Redis数据类型简介。[https://redis.io/topics/data-types-intro](https://redis.io/topics/data-types-intro)
+* 直接在浏览器中尝试Redis。[http://try.redis.io](http://try.redis.io)
+* Redis命令的完整列表。[https://redis.io/commands](https://redis.io/commands)
+* Redis官方文档中还有更多内容。[https://redis.io/documentation](https://redis.io/documentation)
 
 构建Redis
 --------------
@@ -102,7 +102,7 @@ make MALLOC=jemalloc
 单调时钟
 ---------------
 
-默认情况下，Redis将使用POSIX clock_gettime函数作为单调时钟源进行构建。在大多数现代系统中，内部处理器时钟可用于提高性能。注意事项如下：http://oliveryang.net/2015/09/pitfalls-of-TSC-usage/
+默认情况下，Redis将使用POSIX clock_gettime函数作为单调时钟源进行构建。在大多数现代系统中，内部处理器时钟可用于提高性能。注意事项如下：[http://oliveryang.net/2015/09/pitfalls-of-TSC-usage/](http://oliveryang.net/2015/09/pitfalls-of-TSC-usage/)
 
 要在支持处理器内部指令时钟的情况下构建，请使用:
 
@@ -171,4 +171,4 @@ redis> incr mycounter
 redis>
 ```
 
-您可以在以下位置找到所有可用命令的列表：https://redis.io/commands.
+您可以在以下位置找到所有可用命令的列表：[https://redis.io/commands](https://redis.io/commands)。
