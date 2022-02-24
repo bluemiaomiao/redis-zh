@@ -1,34 +1,4 @@
-/* SDSLib 2.0 -- A C dynamic strings library
- *
- * Copyright (c) 2006-2015, Salvatore Sanfilippo <antirez at gmail dot com>
- * Copyright (c) 2015, Oran Agra
- * Copyright (c) 2015, Redis Labs, Inc
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- *   * Redistributions of source code must retain the above copyright notice,
- *     this list of conditions and the following disclaimer.
- *   * Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *   * Neither the name of Redis nor the names of its contributors may be used
- *     to endorse or promote products derived from this software without
- *     specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- */
+// SDSLib 2.0 -- 一个用C构建的动态字符串库
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -87,44 +57,51 @@ static inline size_t sdsTypeMaxSize(char type) {
     return -1; /* this is equivalent to the max SDS_TYPE_64 or SDS_TYPE_32 */
 }
 
-/* Create a new sds string with the content specified by the 'init' pointer
- * and 'initlen'.
- * If NULL is used for 'init' the string is initialized with zero bytes.
- * If SDS_NOINIT is used, the buffer is left uninitialized;
+/* 使用init指针和initlen指定的内容创建新的SDS结构。
+ * 如果init指针是NULL，那么就会创建一个0字节的SDS结构。
+ * 如果使用SDS_NOINIT，缓冲区将保持未初始化状态
  *
- * The string is always null-termined (all the sds strings are, always) so
- * even if you create an sds string with:
- *
+ * 这个字符串总是使用空值结尾，所有的SDS都是这样的，因此即便使用下面的方式创建SDS:
+ * 
  * mystring = sdsnewlen("abc",3);
  *
- * You can print the string with printf() as there is an implicit \0 at the
- * end of the string. However the string is binary safe and can contain
- * \0 characters in the middle, as the length is stored in the sds header. */
+ * 也能通过printf()函数打印出来，但是SDS是二进制安全的，即便 \0 在SDS的中间位置也不会发生截断。
+ */
 sds _sdsnewlen(const void *init, size_t initlen, int trymalloc) {
     void *sh;
     sds s;
     char type = sdsReqType(initlen);
-    /* Empty strings are usually created in order to append. Use type 8
-     * since type 5 is not good at this. */
-    if (type == SDS_TYPE_5 && initlen == 0) type = SDS_TYPE_8;
+    // 空字符串通常是为了追加而创建的。使用为8的长度，因为为5的长度不擅长这个。
+    if (type == SDS_TYPE_5 && initlen == 0) { type = SDS_TYPE_8; }
+
     int hdrlen = sdsHdrSize(type);
-    unsigned char *fp; /* flags pointer. */
+
+    // 标志指针
+    unsigned char *fp;
     size_t usable;
 
-    assert(initlen + hdrlen + 1 > initlen); /* Catch size_t overflow */
-    sh = trymalloc?
-        s_trymalloc_usable(hdrlen+initlen+1, &usable) :
-        s_malloc_usable(hdrlen+initlen+1, &usable);
-    if (sh == NULL) return NULL;
-    if (init==SDS_NOINIT)
+    // 保证size_t没有溢出。
+    assert(initlen + hdrlen + 1 > initlen);
+
+    sh = trymalloc ? s_trymalloc_usable(hdrlen+initlen+1, &usable) : s_malloc_usable(hdrlen+initlen+1, &usable);
+
+    if (sh == NULL) { return NULL; }
+
+    if (init==SDS_NOINIT) {
         init = NULL;
-    else if (!init)
+    } else if (!init) {
         memset(sh, 0, hdrlen+initlen+1);
+    }
+
     s = (char*)sh+hdrlen;
     fp = ((unsigned char*)s)-1;
+
     usable = usable-hdrlen-1;
-    if (usable > sdsTypeMaxSize(type))
+
+    if (usable > sdsTypeMaxSize(type)) {
         usable = sdsTypeMaxSize(type);
+    }
+
     switch(type) {
         case SDS_TYPE_5: {
             *fp = type | (initlen << SDS_TYPE_BITS);
@@ -159,8 +136,11 @@ sds _sdsnewlen(const void *init, size_t initlen, int trymalloc) {
             break;
         }
     }
-    if (initlen && init)
+
+    if (initlen && init) {
         memcpy(s, init, initlen);
+    }
+
     s[initlen] = '\0';
     return s;
 }
@@ -190,9 +170,9 @@ sds sdsdup(const sds s) {
     return sdsnewlen(s, sdslen(s));
 }
 
-/* Free an sds string. No operation is performed if 's' is NULL. */
 void sdsfree(sds s) {
-    if (s == NULL) return;
+    if (s == NULL) { return; }
+
     s_free((char*)s-sdsHdrSize(s[-1]));
 }
 
@@ -215,10 +195,6 @@ void sdsupdatelen(sds s) {
     sdssetlen(s, reallen);
 }
 
-/* Modify an sds string in-place to make it empty (zero length).
- * However all the existing buffer is not discarded but set as free space
- * so that next append operations will not require allocations up to the
- * number of bytes previously available. */
 void sdsclear(sds s) {
     sdssetlen(s, 0);
     s[0] = '\0';
@@ -424,19 +400,18 @@ sds sdsgrowzero(sds s, size_t len) {
     return s;
 }
 
-/* Append the specified binary-safe string pointed by 't' of 'len' bytes to the
- * end of the specified sds string 's'.
- *
- * After the call, the passed sds string is no longer valid and all the
- * references must be substituted with the new pointer returned by the call. */
+// 追加SDS的具体实现
 sds sdscatlen(sds s, const void *t, size_t len) {
     size_t curlen = sdslen(s);
 
     s = sdsMakeRoomFor(s,len);
-    if (s == NULL) return NULL;
+
+    if (s == NULL) { return NULL; }
+
     memcpy(s+curlen, t, len);
     sdssetlen(s, curlen+len);
     s[curlen+len] = '\0';
+
     return s;
 }
 
@@ -448,10 +423,9 @@ sds sdscat(sds s, const char *t) {
     return sdscatlen(s, t, strlen(t));
 }
 
-/* Append the specified sds 't' to the existing sds 's'.
- *
- * After the call, the modified sds string is no longer valid and all the
- * references must be substituted with the new pointer returned by the call. */
+/* 将t追加到s上
+ * 调用后，修改后的sds字符串不再有效，所有引用必须替换为调用返回的新指针
+ */
 sds sdscatsds(sds s, const sds t) {
     return sdscatlen(s, t, sdslen(t));
 }
