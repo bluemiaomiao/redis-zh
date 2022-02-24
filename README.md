@@ -4,6 +4,15 @@
 
 基于 `redis-zh/version.txt` 版本分析。
 
+使用:
+
+```shell
+git clone https://github.com/bluemiaomiao/redis-zh.git redis
+cd redis
+make distclean
+make USE_SYSTEMD=yes MALLOC=jemalloc
+```
+
 ## 依赖库
 
 依赖库目录位于 `redis-zh/deps`，有以下几个依赖库：
